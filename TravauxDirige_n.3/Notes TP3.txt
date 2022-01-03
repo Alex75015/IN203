@@ -1,0 +1,41 @@
+
+cd /mnt/c/Users/33647/"OneDrive - ENSTA Paris"/"ENSTA Paris"/IN203/Promotion_2023/TravauxDirige_n.3/Sources
+
+En ligne de commande : OMP_NUM_THREADS=8 ./dot (car OMP_NUM_THREADS var d'environnement, lorsuqe = 1 mode seq donc)
+Permet de faire varier le nbre de thread
+
+Somme sur ensemble des processus : réduction
+
+hwloc-ls : pour connaitre topo du processeur
+ou pour moi : lscpu
+
+Lancer toujours plusieurs fois programme pour s'assurer que les temps de calcul sont similaires (prog stable)
+
+Commandes liées au Makefile :
+
+make dotproduct.exe
+OMP_NUM_THREADS=8 ./dotproduct.exe
+
+Différence énorme en utilisant param optimisés avec le make file (surtout pour mon PC avec le CPU tiger lake):
+
+$ OMP_NUM_THREADS=1 ./TestProductMatrix.exe
+Test passed
+Temps CPU produit matrice-matrice naif : 0.542683 secondes
+MFlops -> 3957.16
+
+$ ./teest
+Test passed
+Temps CPU produit matrice-matrice naif : 16.5151 secondes
+MFlops -> 130.032
+
+Remarque : lorsque je //, même avec 1 seul thread je n'ai pas de problème de temps plus long
+du fait du cache L2 pour N=1024
+
+Par défaut sans mettre OMP_NUM_THREADS et juste avec ./TestProductMatrix.exe il prend 
+le nombre de thread de façon à être opti en temps de calcul
+
+
+faire test sans hyperthreading :
+mpirun -np 4 --oversubscribe OMP_NUM_THREADS=1./TestProductMatrix.exe
+ça ne marche pas mais c'est l'idée
+

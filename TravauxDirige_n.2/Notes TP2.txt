@@ -1,0 +1,35 @@
+Lorsqu'on veut // : mpi
+
+Dans l'image mandelbrot : gros déséquilabre de charge (notamment à cause des parties bleus)
+
+Sur un prog, regarder grande boucle et granularité pour ensuite //
+
+commande debug apparamment sur github dans le readme
+
+
+Utiliser la fonction mpi gather pour rassembler dans pixels
+
+finir exo en cours + maitre escalve
+
+export DISPLAY=:0
+mpirun -np 4 --oversubscribe xterm -e gdb mandel2
+
+pour debug
+
+
+cd /mnt/c/Users/33647/"OneDrive - ENSTA Paris"/"ENSTA Paris"/IN203/Promotion_2023/TravauxDirige_n.2/Sources
+
+g++ Mandelbrot.cpp -o mandel -g -O3  // ce n'est pas un zéro mais bien un o maj --> permet d'optimiser temps de calcul, le compilo
+// permutte parfois les boucles si mieux en terme de tmps de calcul etc
+
+----------------------------------------------
+
+Pour exo matrice vecteur:
+b_0 = Somme_i(A_0i*v_i)
+en // : b_0 = Somme_proc ( Somme_{i=0 -> nbcol_loc}(A_0i*v_i) )
+
+Surtout ne pas créer des matrices entières sur chaque processus, ce qui couterait trop cher en mémoire
+Créer seulement des matrices de taille N/nbp sur chaque processus
+
+MPI_Allreduce permet que tous les processus récupère tous les morceaux (MPI_Reduce pour qu'un seul processus récupère)
+
