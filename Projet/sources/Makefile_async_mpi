@@ -2,15 +2,14 @@ include Make_linux.inc
 #include Make_msys2.inc
 #include Make_osx.inc
 
-CXXFLAGS += -std=c++17 `sdl2-config --cflags` -fopenmp
+CXXFLAGS += -std=c++17 `sdl2-config --cflags`
 ifdef DEBUG
-CXXFLAGS += -g -O0 -Wall -fbounds-check -pedantic -D_GLIBCXX_DEBUG -DDEBUG
+CXXFLAGS += -g -O0 -Wall -fbounds-check -pedantic -D_GLIBCXX_DEBUG -DDEBUG -finput-charset=utf-8
 else
-CXXFLAGS += -O3 -march=native -Wall
+CXXFLAGS += -O3 -march=native -Wall -finput-charset=utf8 
 endif
 
-LIBS += $(LIB) `sdl2-config --cflags` -lSDL2_ttf -lSDL2_image  `sdl2-config --libs` 
-
+LIBS += $(LIB) `sdl2-config --cflags` -lSDL2_ttf -lSDL2_image  `sdl2-config --libs`
 ALL= simulation.exe
 
 default:	help
@@ -49,11 +48,8 @@ graphisme/src/SDL2/formated_texte.o : graphisme/src/SDL2/window.hpp graphisme/sr
 graphisme/src/SDL2/image.o : graphisme/src/SDL2/window.hpp graphisme/src/SDL2/image.hpp graphisme/src/SDL2/image.cpp
 	$(CXX) $(CXXFLAGS) -c graphisme/src/SDL2/image.cpp -o graphisme/src/SDL2/image.o
 
-simulation.exe:	$(OBJS) simulation_async_mpi_omp.cpp
-	$(CXX) $(CXXFLAGS) $(OBJS) simulation_async_mpi_omp.cpp -o simulation.exe $(LIBS)
-	
-#simulation.exe:	$(OBJS) simulation.cpp
-#	$(CXX) $(CXXFLAGS) $(OBJS) simulation.cpp -o simulation.exe $(LIBS)
+simulation.exe:	$(OBJS) simulation.cpp
+	$(CXX) $(CXXFLAGS) $(OBJS) simulation.cpp -o simulation.exe $(LIBS)
 
 help:
 	@echo "Available targets : "

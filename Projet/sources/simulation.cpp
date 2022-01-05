@@ -125,12 +125,13 @@ void simulation(bool affiche)
 
     std::cout << "Début boucle épidémie" << std::endl << std::flush;
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-    std::chrono::time_point < std::chrono::system_clock > start, end;
+    std::chrono::time_point < std::chrono::system_clock > start, start2, end, end2;
+    float time=0.0;
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-		start = std::chrono::system_clock::now();	
-		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	start = std::chrono::system_clock::now();	
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     while (!quitting)
     {
 		
@@ -196,15 +197,15 @@ void simulation(bool affiche)
         //#############################################################################################################
         
         //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-		//~ start = std::chrono::system_clock::now();	
+		start2 = std::chrono::system_clock::now();	
 		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 		
         if (affiche) afficheSimulation(écran, grille, jours_écoulés);
         
         //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-        //~ end = std::chrono::system_clock::now();
-		//~ std::chrono::duration < double >elapsed_seconds = end - start;
-		//~ std::cout << "Temps  : " << elapsed_seconds.count() << " secondes\n";
+        end2 = std::chrono::system_clock::now();
+        std::chrono::duration < double >elapsed_seconds = end2 - start2;
+		time = time + elapsed_seconds.count();
         //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
         /*std::cout << jours_écoulés << "\t" << grille.nombreTotalContaminésGrippe() << "\t"
@@ -220,8 +221,12 @@ void simulation(bool affiche)
     
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
         end = std::chrono::system_clock::now();
+        
 		std::chrono::duration < double >elapsed_seconds = end - start;
-		std::cout << "Temps moyen : " << elapsed_seconds.count()/jours_écoulés << " secondes\n";
+		std::cout << "Temps moyen par pas de temps simulation : " << elapsed_seconds.count()/jours_écoulés << " secondes\n";
+		
+		
+		std::cout << "Temps moyen par pas de temps affichage : " << time/jours_écoulés << " secondes\n";
         //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     output.close();
 }
@@ -229,7 +234,7 @@ void simulation(bool affiche)
 int main(int argc, char* argv[])
 {
     // parse command-line
-    bool affiche = false;
+    bool affiche = true;
     
     for (int i=0; i<argc; i++) {
 	        std::cout << i << " " << argv[i] << "\n";

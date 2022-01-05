@@ -8,6 +8,11 @@
 #include <chrono>
 # include <mpi.h>
 
+
+MPI_Comm simulationComm;
+
+// graine var globale
+
 void màjStatistique( épidémie::Grille& grille, std::vector<épidémie::Individu> const& individus )
 {
     for ( auto& statistique : grille.getStatistiques() )
@@ -77,36 +82,143 @@ void afficheSimulation(sdl2::window& écran, épidémie::Grille const& grille, s
     écran << sdl2::flush;
 }
 
-void simulation(bool affiche)
+void Processus_Affichage(bool affiche, épidémie::ContexteGlobal contexte)
 {
-	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	if (rank==0)
-	{
-		constexpr const unsigned int largeur_écran = 1280, hauteur_écran = 1024;
-		sdl2::window écran("Simulation épidémie de grippe", {largeur_écran,hauteur_écran});
-	}
+	constexpr const unsigned int largeur_écran = 1280, hauteur_écran = 1024;
+	sdl2::window écran("Simulation épidémie de grippe", {largeur_écran,hauteur_écran});
 	
-	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	if(rank==1)
-	{
-    unsigned int graine_aléatoire = 1;
-    std::uniform_real_distribution<double> porteur_pathogène(0.,1.);
-
-
-    épidémie::ContexteGlobal contexte;
     // contexte.déplacement_maximal = 1; <= Si on veut moins de brassage
     // contexte.taux_population = 400'000;
     //contexte.taux_population = 1'000;
-    contexte.interactions.β = 60.;
+
+    épidémie::Grille grille{contexte.taux_population};
+    
+    std::vector<int> statVector = grille.statistiquesToVector();
+	
+	
+	sdl2::event_queue queue;
+	bool quitting = false;
+	
+	MPI_Request terminer_requete;
+	int jours_écoulés;
+	
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+    //~ std::chrono::time_point < std::chrono::system_clock > start, end;
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+    
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	//~ start = std::chrono::system_clock::now();	
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	
+	while (true)
+    {
+		auto events = queue.pull_events();
+        for ( const auto& e : events)
+        {
+            if (e->kind_of_event() == sdl2::event::quit)
+            {
+                quitting = true;
+                MPI_Isend( &quitting , 1 , MPI_INT , 1 , 0 , MPI_COMM_WORLD, &terminer_requete);
+            }
+        }
+        
+        if (quitting)
+            break;
+		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+		//~ start = std::chrono::system_clock::now();	
+		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	
+		
+        //#############################################################################################################
+        //##    Affichage des résultats pour le temps  actuel
+        //#############################################################################################################
+        
+        //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+		//~ start = std::chrono::system_clock::now();	
+		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+		
+		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+		
+		MPI_Status status;
+		
+		if (affiche)
+		{
+			MPI_Request wait_request;
+            
+            MPI_Isend( nullptr , 0 , MPI_INT , 1 , 1 , MPI_COMM_WORLD , &wait_request);
+            MPI_Recv( statVector.data() , statVector.size() , MPI_INT , 1 , MPI_ANY_TAG , MPI_COMM_WORLD , &status); 
+            grille.vectorToStatistiques(statVector);
+        
+            jours_écoulés = status.MPI_TAG;
+            afficheSimulation(écran, grille, jours_écoulés);
+        }   
+		
+	}// Fin boucle temporelle
+		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	int flag = 0;
+	MPI_Iprobe( 1 , 0 , MPI_COMM_WORLD , &flag , MPI_STATUS_IGNORE);
+		
+	if (!flag && affiche) {
+	MPI_Recv( statVector.data() , statVector.size() , MPI_INT , 1 , MPI_ANY_TAG , 
+				MPI_COMM_WORLD , MPI_STATUS_IGNORE);
+	}
+        
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	//~ end = std::chrono::system_clock::now();
+	//~ std::chrono::duration < double >elapsed_seconds = end - start;
+	//~ std::cout << "Temps  : " << elapsed_seconds.count() << " secondes\n";
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+	/*std::cout << jours_écoulés << "\t" << grille.nombreTotalContaminésGrippe() << "\t"
+			  << grille.nombreTotalContaminésAgentPathogène() << std::endl;*/
+	
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	//~ end = std::chrono::system_clock::now();
+	//~ std::chrono::duration < double >elapsed_seconds = end - start;
+	//~ std::cout << "Temps  : " << elapsed_seconds.count() << " secondes\n";
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	
+    
+    //~ if (affiche)
+	//~ {
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	//~ end = std::chrono::system_clock::now();
+	//~ std::chrono::duration < double >elapsed_seconds = end - start;
+	//~ std::cout << "Temps moyen par pas de temps à l'affichage : " << elapsed_seconds.count()/jours_écoulés << " secondes\n";
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	//~ }
+}
+
+void Processus_Simulation(bool affiche, épidémie::ContexteGlobal contexte)
+{
+    int nbp;
+	MPI_Comm_size(simulationComm, &nbp);
+
+	int rank;
+	MPI_Comm_rank(simulationComm, &rank);
+	
+	
+	int qtd_population = contexte.taux_population / nbp + (rank < contexte.taux_population % nbp);
+    int i_begin = rank * contexte.taux_population / nbp + (rank < contexte.taux_population % nbp ? rank : contexte.taux_population % nbp);
+    int i_end = i_begin + qtd_population;
+    
+	unsigned int graine_aléatoire = 1;
+	std::uniform_real_distribution<double> porteur_pathogène(0.,1.);
+    // contexte.déplacement_maximal = 1; <= Si on veut moins de brassage
+    // contexte.taux_population = 400'000;
+    //contexte.taux_population = 1'000;
+
     std::vector<épidémie::Individu> population;
-    population.reserve(contexte.taux_population);
+    population.reserve(qtd_population);
     épidémie::Grille grille{contexte.taux_population};
 
     auto [largeur_grille,hauteur_grille] = grille.dimension();
     // L'agent pathogène n'évolue pas et reste donc constant...
     épidémie::AgentPathogène agent(graine_aléatoire++);
     // Initialisation de la population initiale :
-    for (std::size_t i = 0; i < contexte.taux_population; ++i )
+    
+    graine_aléatoire += i_begin;
+    for (std::size_t i = i_begin; i < i_end; ++i )
     {
         std::default_random_engine motor(100*(i+1));
         population.emplace_back(graine_aléatoire++, contexte.espérance_de_vie, contexte.déplacement_maximal);
@@ -117,65 +229,76 @@ void simulation(bool affiche)
         }
     }
 
-    std::size_t jours_écoulés = 0;
+    std::ofstream output;
+    if (rank == 0) {
+        output.open("Courbe.dat");
+		output << "# jours_écoulés \t nombreTotalContaminésGrippe \t nombreTotalContaminésAgentPathogène()" << std::endl;
+	}
+	
+	std::size_t jours_écoulés = 0;
     int         jour_apparition_grippe = 0;
     int         nombre_immunisés_grippe= (contexte.taux_population*23)/100;
-    sdl2::event_queue queue;
+    
+	épidémie::Grippe grippe(0);
+    //~ bool quitting = false; // fonctionne pas pour MPI_Probe donc utilise un int
+    int quitting = 0;
+	
+    
+    
+    std::chrono::time_point < std::chrono::system_clock > begin, end;
+    if (rank == 0){
+		MPI_Iprobe( 0, 0 , MPI_COMM_WORLD , &quitting , MPI_STATUS_IGNORE);
 
-    bool quitting = false;
-
-    std::ofstream output("Courbe.dat");
-    output << "# jours_écoulés \t nombreTotalContaminésGrippe \t nombreTotalContaminésAgentPathogène()" << std::endl;
-
-    épidémie::Grippe grippe(0);
-	} // fin du if(rank==1)
 	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
-    std::cout << "Début boucle épidémie" << std::endl << std::flush;
+		std::cout << "Début boucle épidémie" << std::endl << std::flush;
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-    std::chrono::time_point < std::chrono::system_clock > start, end;
+		begin = std::chrono::system_clock::now();
     //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	}
+    //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+		
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
     while (!quitting)
     {
 		
 		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-		start = std::chrono::system_clock::now();	
-		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-		
-		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-		if(rank==1)
-		{
-        auto events = queue.pull_events();
-        for ( const auto& e : events)
-        {
-            if (e->kind_of_event() == sdl2::event::quit)
-                quitting = true;
-        }
+		//~ MPI_Iprobe( 0, 0 , MPI_COMM_WORLD , &quitting , MPI_STATUS_IGNORE);
+		//~ if (quitting)
+            //~ break;
+
+
         if (jours_écoulés%365 == 0)// Si le premier Octobre (début de l'année pour l'épidémie ;-) )
         {
             grippe = épidémie::Grippe(jours_écoulés/365);
             jour_apparition_grippe = grippe.dateCalculImportationGrippe();
             grippe.calculNouveauTauxTransmission();
             // 23% des gens sont immunisés. On prend les 23% premiers
-            for ( int ipersonne = 0; ipersonne < nombre_immunisés_grippe; ++ipersonne)
+            for ( int ipersonne = i_begin; ipersonne < nombre_immunisés_grippe && ipersonne < i_end; ++ipersonne)
             {
-                population[ipersonne].devientImmuniséGrippe();
+                population[ipersonne - i_begin].devientImmuniséGrippe();
             }
-            for ( int ipersonne = nombre_immunisés_grippe; ipersonne < int(contexte.taux_population); ++ipersonne )
+            for ( int ipersonne = nombre_immunisés_grippe > i_begin ? nombre_immunisés_grippe : i_begin; ipersonne < i_end; ++ipersonne )
             {
-                population[ipersonne].redevientSensibleGrippe();
+                population[ipersonne - i_begin].redevientSensibleGrippe();
             }
         }
         if (jours_écoulés%365 == std::size_t(jour_apparition_grippe))
         {
-            for (int ipersonne = nombre_immunisés_grippe; ipersonne < nombre_immunisés_grippe + 25; ++ipersonne )
+            for (int ipersonne = nombre_immunisés_grippe > i_begin ? nombre_immunisés_grippe : i_begin;
+                 ipersonne < nombre_immunisés_grippe + 25 && ipersonne < i_end; ++ipersonne )
             {
-                population[ipersonne].estContaminé(grippe);
+                population[ipersonne - i_begin].estContaminé(grippe);
             }
         }
         // Mise à jour des statistiques pour les cases de la grille :
         màjStatistique(grille, population);
         // On parcout la population pour voir qui est contaminé et qui ne l'est pas, d'abord pour la grippe puis pour l'agent pathogène
+        
+        std::vector<int> statVector = grille.statistiquesToVector();
+        MPI_Allreduce( MPI_IN_PLACE , statVector.data(), statVector.size() , MPI_INT , MPI_SUM , simulationComm);
+        grille.vectorToStatistiques(statVector);
+        
         std::size_t compteur_grippe = 0, compteur_agent = 0, mouru = 0;
         for ( auto& personne : population )
         {
@@ -200,101 +323,115 @@ void simulation(bool affiche)
             personne.veillirDUnJour();
             personne.seDéplace(grille);
         }
-        MPI_Send(&grille, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD);
-        MPI_Send(&jours_écoulés, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD);
-		} // fin du if(rank==1)
+        //~ MPI_Iprobe( 0, 0 , MPI_COMM_WORLD , &quitting , MPI_STATUS_IGNORE);
+        //~ if (quitting)
+            //~ break;
+        
+        
+        if (rank == 0 && affiche)  
+        {
+            if (affiche) {
+                int waiting;
+                
+                MPI_Iprobe( 0, 1 , MPI_COMM_WORLD , &waiting , MPI_STATUS_IGNORE);
+                
+                if (waiting) 
+                {
+                    std::vector<int> statVector = grille.statistiquesToVector();
+                    MPI_Recv( nullptr , 0 , MPI_INT , 0 , 1 , MPI_COMM_WORLD , MPI_STATUS_IGNORE);
+                    MPI_Send( statVector.data() , statVector.size() , MPI_INT , 0 , jours_écoulés , MPI_COMM_WORLD);
+                }
+            }
+        }
+        //~ MPI_Send(&jours_écoulés, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD);
+
 	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	
-		
-        //#############################################################################################################
-        //##    Affichage des résultats pour le temps  actuel
-        //#############################################################################################################
-        
-        //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-		//~ start = std::chrono::system_clock::now();	
-		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-		
-		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-		if (rank == 0)
-		{
-			MPI_Status status;
-			int buf = 42;
 
-
-			MPI_Send(&buf, 1, MPI_INT, 1, MPI_ANY_TAG, MPI_COMM_WORLD);
-			MPI_Recv(&grille, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			MPI_Recv(&jours_écoulés, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			
-			std::cout << "Mon jeton vaut : " << buf << " et je suis le processus numéro " << rank << std::endl;
-			
-			if (affiche) afficheSimulation(écran, grille, jours_écoulés);
-		}
-		//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-			
-        
-        //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-        //~ end = std::chrono::system_clock::now();
-		//~ std::chrono::duration < double >elapsed_seconds = end - start;
-		//~ std::cout << "Temps  : " << elapsed_seconds.count() << " secondes\n";
-        //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
         /*std::cout << jours_écoulés << "\t" << grille.nombreTotalContaminésGrippe() << "\t"
                   << grille.nombreTotalContaminésAgentPathogène() << std::endl;*/
 
-        output << jours_écoulés << "\t" << grille.nombreTotalContaminésGrippe() << "\t"
-               << grille.nombreTotalContaminésAgentPathogène() << std::endl;
-        jours_écoulés += 1;
-        
-        //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-        //~ end = std::chrono::system_clock::now();
-		//~ std::chrono::duration < double >elapsed_seconds = end - start;
-		//~ std::cout << "Temps  : " << elapsed_seconds.count() << " secondes\n";
-        //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	if (rank == 0) 
+	{
+		output << jours_écoulés << "\t" << grille.nombreTotalContaminésGrippe() << "\t"
+			   << grille.nombreTotalContaminésAgentPathogène() << std::endl;
+
+		// On regarde si il faut quitter
+		MPI_Iprobe( 0, 0 , MPI_COMM_WORLD , &quitting , MPI_STATUS_IGNORE);
+	}
+
+	MPI_Bcast( &quitting , 1 , MPI_INT , 0 , simulationComm);
+
+	jours_écoulés += 1;
         
     }// Fin boucle temporelle
-    output.close();
+    
+    if (rank == 0) 
+    {
+        end = std::chrono::system_clock::now();
+        std::chrono::duration < double >elapsed_seconds = end - begin;
+        std::cout << "Temps moyen par pas de temps à l'affichage : "
+                        << elapsed_seconds.count()/jours_écoulés 
+                        << " secondes" << std::endl;
+    
+        
+        MPI_Request terminer_requete;
+        MPI_Isend( nullptr , 0 , MPI_INT , 0 , 0 , MPI_COMM_WORLD , &terminer_requete);
+
+        output.close();
+    }
+}
+
+void simulation(bool affiche)
+{
+    
+    int nbp;
+	MPI_Comm_size(MPI_COMM_WORLD, &nbp);
+
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	
+	épidémie::ContexteGlobal contexte;
+	contexte.interactions.β = 60.;
+	
+	MPI_Comm_split( MPI_COMM_WORLD , rank != 0 , rank == 0 ? 0 : rank - 1 , &simulationComm);
+    
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	if (rank==0)
+	{
+		Processus_Affichage(affiche, contexte);
+	}
+	
+	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	else
+	{
+		Processus_Simulation(affiche, contexte);
+	}
+	std::cout << "Le processus" << rank << " est terminé\n";
 }
 
 int main(int argc, char* argv[])
 {
 	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	MPI_Init( &nargs, &argv );
 
-	MPI_Comm globComm;
-	MPI_Comm_dup(MPI_COMM_WORLD, &globComm);
 
-	int nbp;
-	MPI_Comm_size(globComm, &nbp);
-
-	int rank;
-	MPI_Comm_rank(globComm, &rank);
 	//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	
     // parse command-line
     bool affiche = true;
-    
     for (int i=0; i<argc; i++) {
-	        std::cout << i << " " << argv[i] << "\n";
+      std::cout << i << " " << argv[i] << "\n";
       if (std::string("-nw") == argv[i]) affiche = false;
     }
   
     sdl2::init(argc, argv);
     {
+        MPI_Init( &argc, &argv );
         simulation(affiche);
+        MPI_Finalize();
     }
     sdl2::finalize();
-    MPI_Finalize();
     return EXIT_SUCCESS;
 }
 
-/* 
-  std::chrono::time_point < std::chrono::system_clock > start, end;
-  start = std::chrono::system_clock::now();
-
-  end = std::chrono::system_clock::now();
-  std::chrono::duration < double >elapsed_seconds = end - start;
-
-
-      std::cout << "Test passed\n";
-      std::cout << "Temps  : " << elapsed_seconds.count() << " secondes\n";
-*/
